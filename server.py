@@ -22,17 +22,33 @@ def signup():
     data = request.json
     username = data.get("username")
     password = data.get("password")
+    roll_number = data.get("rollNumber")  # New field
+    section = data.get("section")  # New field
+    year = data.get("year")  # New field
 
-    if not username or not password:
-        return jsonify({"error": "Username and password required"}), 400
+    if not username or not password or not roll_number or not section or not year:
+        return jsonify({"error": "All fields are required"}), 400
 
     if users_collection.find_one({"username": username}):
         return jsonify({"error": "User already exists"}), 409
 
+    if users_collection.find_one({"roll_number": roll_number}):  # Ensure unique roll number
+        return jsonify({"error": "Roll number already in use"}), 409
+
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    users_collection.insert_one({"username": username, "password": hashed_password.decode('utf-8')})
+    
+    user_data = {
+        "username": username,
+        "password": hashed_password.decode('utf-8'),
+        "roll_number": roll_number,
+        "section": section,
+        "year": year
+    }
+    
+    users_collection.insert_one(user_data)
 
     return jsonify({"message": "User registered successfully!"}), 201
+
 
 @app.route('/login', methods=['POST'])
 def login():
