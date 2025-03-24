@@ -64,13 +64,13 @@ def login():
     user = users_collection.find_one({"username": username})
 
     if user and bcrypt.checkpw(password.encode('utf-8'), user["password"].encode('utf-8')):
-    return jsonify({
-        "message": "Login successful!",
-        "fullname": user["fullname"],
-        "rollNumber": user["roll_number"],
-        "section": user["section"],
-        "year": user["year"]
-    }), 200
+        return jsonify({
+            "message": "Login successful!",
+            "fullname": user["fullname"],
+            "rollNumber": user["roll_number"],
+            "section": user["section"],
+            "year": user["year"]
+        }), 200
 
     else:
         return jsonify({"error": "Invalid credentials"}), 401
