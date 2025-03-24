@@ -20,6 +20,7 @@ images_collection = db["Images"]  # New collection for storing images
 @app.route('/signup', methods=['POST'])
 def signup():
     data = request.json
+    fullname = data.get("fullname")
     username = data.get("username")
     password = data.get("password")
     roll_number = data.get("rollNumber")  # New field
@@ -38,6 +39,7 @@ def signup():
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     
     user_data = {
+        "fullname": fullname,
         "username": username,
         "password": hashed_password.decode('utf-8'),
         "roll_number": roll_number,
