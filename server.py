@@ -124,9 +124,15 @@ def get_paper_ids():
     if not subject:
         return jsonify({"error": "Subject is required"}), 400
 
+    print(f"Querying collection: {subject}")
+    print(f"Available collections: {submissions_db.list_collection_names()}")
+
     subject_collection = submissions_db[subject]
     paper_ids = subject_collection.distinct("paper_id")
+
+    print(f"Found paper IDs: {paper_ids}")  # Debugging
     return jsonify({"paper_ids": paper_ids}), 200
+
 
 # ----------- TEST ROUTE ------------
 @app.route('/test', methods=['GET'])
