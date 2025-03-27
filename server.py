@@ -7,7 +7,7 @@ import os
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Get MongoDB connection string from environment variable
+# 🔹 Get MongoDB connection string from environment variable
 MONGO_URI = os.getenv("MONGO_URI")
 if not MONGO_URI:
     raise ValueError("MONGO_URI environment variable is not set!")
@@ -15,29 +15,31 @@ if not MONGO_URI:
 client = MongoClient(MONGO_URI)
 db = client["User_Data"]
 users_collection = db["Users"]
-images_collection = db["Images"]  # New collection for storing images
+submissions_db = client["SUBMISSIONS"]  # Database for storing submissions
 
+# ----------- SIGNUP ------------
 @app.route('/signup', methods=['POST'])
 def signup():
     data = request.json
     fullname = data.get("fullname")
     username = data.get("username")
     password = data.get("password")
-    roll_number = data.get("rollNumber")  # New field
-    section = data.get("section")  # New field
-    year = data.get("year")  # New field
+    roll_number = data.get("rollNumber")  # Ensure roll number is unique
+    section = data.get("section")
+    year = data.get("year")
 
-    if not username or not password or not roll_number or not section or not year:
+    if not all([fullname, username, password, roll_number, section, year]):
         return jsonify({"error": "All fields are required"}), 400
 
+    # Check if username or roll number already exists
     if users_collection.find_one({"username": username}):
-        return jsonify({"error": "User already exists"}), 409
-
-    if users_collection.find_one({"roll_number": roll_number}):  # Ensure unique roll number
+        return jsonify({"error": "Username already exists"}), 409
+    if users_collection.find_one({"roll_number": roll_number}):
         return jsonify({"error": "Roll number already in use"}), 409
 
+    # Hash the password before storing
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    
+
     user_data = {
         "fullname": fullname,
         "username": username,
@@ -51,7 +53,7 @@ def signup():
 
     return jsonify({"message": "User registered successfully!"}), 201
 
-
+# ----------- LOGIN ------------
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
@@ -71,37 +73,67 @@ def login():
             "section": user["section"],
             "year": user["year"]
         }), 200
+    
+    return jsonify({"error": "Invalid credentials"}), 401
 
-    else:
-        return jsonify({"error": "Invalid credentials"}), 401
-
-# New route to store image URLs in MongoDB
-@app.route('/saveImage', methods=['POST'])
-def save_image():
+# ----------- SAVE IMAGE URL ------------
+@app.route('/save_submission', methods=['POST'])
+def save_submission():
     data = request.json
-    image_url = data.get("imageUrl")
-    username = data.get("username")  # Optional: Store user association
+    subject = request.args.get("subject")  # Subject is passed as a query parameter
+    year = data.get("year")
+    section = data.get("section")
+    roll_number = data.get("roll_number")
+    paper_id = data.get("paper_id")
+    question_number = str(data.get("question_number"))
+    image_url = data.get("image_url")
 
-    if not image_url:
-        return jsonify({"error": "Image URL is required"}), 400
+    if not all([subject, year, section, roll_number, paper_id, question_number, image_url]):
+        return jsonify({"error": "All fields are required"}), 400
 
-    image_data = {"imageUrl": image_url}
-    if username:
-        image_data["username"] = username
+    subject_collection = submissions_db[subject]  # Choose the subject collection
 
-    images_collection.insert_one(image_data)
+    # Check if submission exists
+    submission = subject_collection.find_one({
+        "year": year, "section": section, "roll_number": roll_number, "paper_id": paper_id
+    })
+
+    if submission:
+        # Update existing submission with new image URL
+        subject_collection.update_one(
+            {"_id": submission["_id"]},
+            {"$set": {f"image_urls.{question_number}": image_url}}
+        )
+    else:
+        # Create new submission document
+        submission_data = {
+            "year": year,
+            "section": section,
+            "roll_number": roll_number,
+            "paper_id": paper_id,
+            "image_urls": {question_number: image_url}
+        }
+        subject_collection.insert_one(submission_data)
 
     return jsonify({"message": "Image URL saved successfully!"}), 201
 
-@app.route('/getImages', methods=['GET'])
-def get_images():
-    images = list(images_collection.find({}, {"_id": 0, "imageUrl": 1}))  # Return only image URLs
-    return jsonify(images), 200
+# ----------- GET PAPER IDS FOR SUBJECT ------------
+@app.route('/get_paper_ids', methods=['GET'])
+def get_paper_ids():
+    subject = request.args.get("subject")
+    if not subject:
+        return jsonify({"error": "Subject is required"}), 400
 
+    subject_collection = submissions_db[subject]
+    paper_ids = subject_collection.distinct("paper_id")
+    return jsonify({"paper_ids": paper_ids}), 200
+
+# ----------- TEST ROUTE ------------
 @app.route('/test', methods=['GET'])
 def test():
     return "Test route works!", 200
 
+# ----------- START SERVER ------------
 if __name__ == '__main__':
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    port = int(os.getenv("PORT", 5000))  # Use PORT from environment or default to 5000
+    app.run(host="0.0.0.0", port=port, debug=True)
