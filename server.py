@@ -80,38 +80,37 @@ def login():
 @app.route('/save_submission', methods=['POST'])
 def save_submission():
     data = request.json
-    subject = request.args.get("subject")  # Subject is passed as a query parameter
-    year = data.get("year")
-    section = data.get("section")
-    roll_number = data.get("roll_number")
-    paper_id = data.get("paper_id")
-    question_number = str(data.get("question_number"))
-    image_url = data.get("image_url")
+    subject = request.args.get("subject")
+    print("Received Data:", data)  # Debugging
+    print("Subject:", subject)
 
-    if not all([subject, year, section, roll_number, paper_id, question_number, image_url]):
+    if not all([subject, data.get("year"), data.get("section"), data.get("roll_number"), 
+                data.get("paper_id"), str(data.get("question_number")), data.get("image_url")]):
+        print("Missing data!")
         return jsonify({"error": "All fields are required"}), 400
 
-    subject_collection = submissions_db[subject]  # Choose the subject collection
+    subject_collection = submissions_db[subject]  # Select the correct collection
 
-    # Check if submission exists
+    # Find existing submission
     submission = subject_collection.find_one({
-        "year": year, "section": section, "roll_number": roll_number, "paper_id": paper_id
+        "year": data["year"], "section": data["section"], 
+        "roll_number": data["roll_number"], "paper_id": data["paper_id"]
     })
 
     if submission:
-        # Update existing submission with new image URL
+        print("Updating existing document...")
         subject_collection.update_one(
             {"_id": submission["_id"]},
-            {"$set": {f"image_urls.{question_number}": image_url}}
+            {"$set": {f"image_urls.{str(data['question_number'])}": data["image_url"]}}
         )
     else:
-        # Create new submission document
+        print("Creating new document...")
         submission_data = {
-            "year": year,
-            "section": section,
-            "roll_number": roll_number,
-            "paper_id": paper_id,
-            "image_urls": {question_number: image_url}
+            "year": data["year"],
+            "section": data["section"],
+            "roll_number": data["roll_number"],
+            "paper_id": data["paper_id"],
+            "image_urls": {str(data["question_number"]): data["image_url"]}
         }
         subject_collection.insert_one(submission_data)
 
