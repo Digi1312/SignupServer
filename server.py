@@ -128,7 +128,7 @@ def get_paper_ids():
     print(f"Available collections: {submissions_db.list_collection_names()}")
 
     subject_collection = submissions_db[subject]
-    paper_ids = subject_collection.distinct("paper_id")
+    paper_ids = db[subject].distinct("paper_id")
 
     print(f"Found paper IDs: {paper_ids}")  # Debugging
     return jsonify({"paper_ids": paper_ids}), 200
