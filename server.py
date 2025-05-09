@@ -150,10 +150,8 @@ def get_all_paper_ids():
 def get_result():
     paper_id = request.args.get("paper_id")
     roll_number = request.args.get("roll_number")
-    section = request.args.get("section")
-    year = request.args.get("year")
 
-    if not all([paper_id, roll_number, section, year]):
+    if not all([paper_id, roll_number]):
         return jsonify({"error": "Missing query parameters"}), 400
 
     results = []
@@ -161,9 +159,7 @@ def get_result():
         collection = results_db[subject]
         doc = collection.find_one({
             "paper_id": paper_id,
-            "roll_number": roll_number,
-            "section": section,
-            "year": year
+            "roll_no": roll_number,
         })
         if doc:
             for q_no, score in doc.get("similarity_scores", {}).items():
