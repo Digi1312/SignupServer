@@ -16,6 +16,7 @@ client = MongoClient(MONGO_URI)
 db = client["User_Data"]
 users_collection = db["Users"]
 submissions_db = client["SUBMISSIONS"]  # Database for storing submissions
+results_db=client["Results"]
 
 # ----------- SIGNUP ------------
 @app.route('/signup', methods=['POST'])
@@ -132,6 +133,18 @@ def get_paper_ids():
 
     print(f"Found paper IDs: {paper_ids}")  # Debugging
     return jsonify({"paper_ids": paper_ids}), 200
+
+# ----------- GET ALL PAPER IDS FROM ALL SUBJECT COLLECTIONS ------------
+@app.route('/get_all_paper_ids', methods=['GET'])
+def get_all_paper_ids():
+    all_paper_ids = set()  # To keep only unique paper_ids
+
+    for collection_name in results_db.list_collection_names():
+        collection = results_db[collection_name]
+        paper_ids = collection.distinct("paper_id")
+        all_paper_ids.update(paper_ids)
+
+    return jsonify(sorted(list(all_paper_ids))), 200
 
 
 # ----------- TEST ROUTE ------------
