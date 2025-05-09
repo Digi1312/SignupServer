@@ -145,7 +145,32 @@ def get_all_paper_ids():
         all_paper_ids.update(paper_ids)
 
     return jsonify(sorted(list(all_paper_ids))), 200
+# ----------- View result ------------
+@app.route('/get_result', methods=['GET'])
+def get_result():
+    paper_id = request.args.get("paper_id")
+    roll_number = request.args.get("roll_number")
+    section = request.args.get("section")
+    year = request.args.get("year")
 
+    if not all([paper_id, roll_number, section, year]):
+        return jsonify({"error": "Missing query parameters"}), 400
+
+    results = []
+    for subject in results_db.list_collection_names():
+        collection = results_db[subject]
+        doc = collection.find_one({
+            "paper_id": paper_id,
+            "roll_number": roll_number,
+            "section": section,
+            "year": year
+        })
+        if doc:
+            for q_no, score in doc.get("similarity_scores", {}).items():
+                results.append({"question_no": q_no, "similarity_score": score})
+            break
+
+    return jsonify(results), 200
 
 # ----------- TEST ROUTE ------------
 @app.route('/test', methods=['GET'])
