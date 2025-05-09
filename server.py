@@ -149,24 +149,26 @@ def get_all_paper_ids():
 @app.route('/get_result', methods=['GET'])
 def get_result():
     paper_id = request.args.get("paper_id")
-    roll_number = request.args.get("roll_number")
+    roll_no = request.args.get("roll_no")  # <- change here to match MongoDB fields
 
-    if not all([paper_id, roll_number]):
+    if not all([paper_id, roll_no]):
         return jsonify({"error": "Missing query parameters"}), 400
 
     results = []
     for subject in results_db.list_collection_names():
         collection = results_db[subject]
-        doc = collection.find_one({
+        docs = collection.find({
             "paper_id": paper_id,
-            "roll_no": roll_number,
+            "roll_no": roll_no
         })
-        if doc:
-            for q_no, score in doc.get("similarity_scores", {}).items():
-                results.append({"question_no": q_no, "similarity_score": score})
-            break
+        for doc in docs:
+            results.append({
+                "question_no": doc["question_no"],
+                "similarity_score": doc["similarity_score"]
+            })
 
     return jsonify(results), 200
+
 
 # ----------- TEST ROUTE ------------
 @app.route('/test', methods=['GET'])
