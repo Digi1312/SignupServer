@@ -157,56 +157,57 @@ def get_result():
         return jsonify({"error": "Missing required parameters: paper_id and roll_no"}), 400
 
     comprehensive_results = []
-    
-    # Get all subjects with results for this paper and student
-    subject_names = results_db.list_collection_names()
-    
-    for subject in subject_names:
-        result_collection = results_db[subject]
-        result_docs = result_collection.find({
-            "paper_id": paper_id,
-            "roll_no": roll_no
-        })
 
-        # Early skip if no results
-        if result_docs.count() == 0:
-            continue
+    try:
+        subject_names = results_db.list_collection_names()
 
-        # Related collections
-        extracted_collection = extracted_db[subject]
-        ideal_answer_collection = user_data_db[subject.lower()]
-        
-        for doc in result_docs:
-            question_no = doc.get("question_no")
-            
-            # Extract student's answer text
-            extracted_doc = extracted_collection.find_one({
+        for subject in subject_names:
+            result_collection = results_db[subject]
+            result_docs = result_collection.find({
                 "paper_id": paper_id,
-                "roll_no": roll_no,
-                "question_no": question_no
-            })
-            student_text = extracted_doc.get("extracted_text") if extracted_doc else "No extracted text found"
-
-            # Extract ideal teacher answer
-            ideal_doc = ideal_answer_collection.find_one({
-                "paper_id": paper_id,
-                "question_no": question_no
-            })
-            teacher_text = ideal_doc.get("answer_text") if ideal_doc else "No ideal answer found"
-
-            comprehensive_results.append({
-                "subject": subject,
-                "question_no": question_no,
-                "similarity_score": doc.get("similarity_score", 0),
-                "teacher_text": teacher_text,
-                "student_text": student_text
+                "roll_no": roll_no
             })
 
-    if not comprehensive_results:
-        return jsonify({"message": "No results found for the given paper_id and roll_no"}), 404
+            extracted_collection = client["extracted"][subject]
+            ideal_collection = db[subject]
 
-    return jsonify(comprehensive_results), 200
+            for doc in result_docs:
+                try:
+                    question_no = doc.get("question_no")
+                    similarity_score = doc.get("similarity_score", 0)
 
+                    extracted_doc = extracted_collection.find_one({
+                        "paper_id": paper_id,
+                        "roll_no": roll_no,
+                        "question_no": question_no
+                    })
+                    student_text = extracted_doc.get("extracted_text", "No extracted text found") if extracted_doc else "No extracted text found"
+
+                    ideal_doc = ideal_collection.find_one({
+                        "paper_id": paper_id,
+                        "question_no": question_no
+                    })
+                    teacher_text = ideal_doc.get("answer_text", "No ideal answer found") if ideal_doc else "No ideal answer found"
+
+                    comprehensive_results.append({
+                        "subject": subject,
+                        "question_no": question_no,
+                        "similarity_score": similarity_score,
+                        "teacher_text": teacher_text,
+                        "student_text": student_text
+                    })
+                except Exception as e:
+                    print(f"Error processing document in subject {subject}: {e}")
+                    continue
+
+        if not comprehensive_results:
+            return jsonify({"message": "No results found for the given paper_id and roll_no"}), 404
+
+        return jsonify(comprehensive_results), 200
+
+    except Exception as e:
+        print(f"Server Error in /get_result: {e}")
+        return jsonify({"error": "Server error occurred", "details": str(e)}), 500
 
 # ----------- TEST ROUTE ------------
 @app.route('/test', methods=['GET'])
