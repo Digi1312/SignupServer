@@ -168,8 +168,8 @@ def get_result():
                 "roll_no": roll_no
             })
 
-            extracted_collection = client["extracted"][subject]
-            ideal_collection = db[subject]
+            extracted_collection = client["Extracted"][subject]
+            ideal_collection = db[subject.lower()]
 
             for doc in result_docs:
                 try:
