@@ -17,6 +17,8 @@ db = client["User_Data"]
 users_collection = db["Users"]
 submissions_db = client["SUBMISSIONS"]  # Database for storing submissions
 results_db=client["Results"]
+extracted_db = client["extracted"]
+user_data_db = client["User_Data"]
 
 # ----------- SIGNUP ------------
 @app.route('/signup', methods=['POST'])
@@ -149,25 +151,61 @@ def get_all_paper_ids():
 @app.route('/get_result', methods=['GET'])
 def get_result():
     paper_id = request.args.get("paper_id")
-    roll_no = request.args.get("roll_no")  # <- change here to match MongoDB fields
+    roll_no = request.args.get("roll_no")
 
     if not all([paper_id, roll_no]):
-        return jsonify({"error": "Missing query parameters"}), 400
+        return jsonify({"error": "Missing required parameters: paper_id and roll_no"}), 400
 
-    results = []
-    for subject in results_db.list_collection_names():
-        collection = results_db[subject]
-        docs = collection.find({
+    comprehensive_results = []
+    
+    # Get all subjects with results for this paper and student
+    subject_names = results_db.list_collection_names()
+    
+    for subject in subject_names:
+        result_collection = results_db[subject]
+        result_docs = result_collection.find({
             "paper_id": paper_id,
             "roll_no": roll_no
         })
-        for doc in docs:
-            results.append({
-                "question_no": doc["question_no"],
-                "similarity_score": doc["similarity_score"]
+
+        # Early skip if no results
+        if result_docs.count() == 0:
+            continue
+
+        # Related collections
+        extracted_collection = extracted_db[subject]
+        ideal_answer_collection = user_data_db[subject.lower()]
+        
+        for doc in result_docs:
+            question_no = doc.get("question_no")
+            
+            # Extract student's answer text
+            extracted_doc = extracted_collection.find_one({
+                "paper_id": paper_id,
+                "roll_no": roll_no,
+                "question_no": question_no
+            })
+            student_text = extracted_doc.get("extracted_text") if extracted_doc else "No extracted text found"
+
+            # Extract ideal teacher answer
+            ideal_doc = ideal_answer_collection.find_one({
+                "paper_id": paper_id,
+                "question_no": question_no
+            })
+            teacher_text = ideal_doc.get("answer_text") if ideal_doc else "No ideal answer found"
+
+            comprehensive_results.append({
+                "subject": subject,
+                "question_no": question_no,
+                "similarity_score": doc.get("similarity_score", 0),
+                "teacher_text": teacher_text,
+                "student_text": student_text
             })
 
-    return jsonify(results), 200
+    if not comprehensive_results:
+        return jsonify({"message": "No results found for the given paper_id and roll_no"}), 404
+
+    return jsonify(comprehensive_results), 200
 
 
 # ----------- TEST ROUTE ------------
